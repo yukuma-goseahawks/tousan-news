@@ -77,6 +77,7 @@
 
 <footer>
   <p>※ 本サイトはGoogle Newsから自動取得した情報を表示しています。内容の正確性は各出典元をご確認ください。</p>
+  <p>ニュースは30分ごとに自動更新されます。</p>
   <p>&copy; 2026 倒産ニュースまとめ</p>
 </footer>
 
@@ -124,13 +125,28 @@
     return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  // --- Fetch news.json (built by GitHub Actions) ---
+  // --- Data sources (try raw GitHub first for freshest data, then local) ---
+  var DATA_URLS = [
+    'https://raw.githubusercontent.com/yukuma-goseahawks/tousan-news/master/news.json',
+    'news.json'
+  ];
+
   function fetchNews() {
     statusEl.className = 'status';
     statusEl.innerHTML = '<span class="spinner"></span>ニュースを取得中...';
     cardGrid.innerHTML = '';
+    tryFetch(0);
+  }
 
-    fetch('news.json?t=' + Date.now())
+  function tryFetch(index) {
+    if (index >= DATA_URLS.length) {
+      statusEl.className = 'status error';
+      statusEl.textContent = 'ニュースデータの取得に失敗しました。しばらくしてから再度お試しください。';
+      lastUpdatedEl.textContent = '';
+      return;
+    }
+    var url = DATA_URLS[index] + '?t=' + Date.now();
+    fetch(url)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
@@ -144,9 +160,7 @@
         lastUpdatedEl.textContent = '最終更新: ' + (fetched && !isNaN(fetched) ? fetched.toLocaleString('ja-JP') : '不明');
       })
       .catch(function () {
-        statusEl.className = 'status error';
-        statusEl.textContent = 'ニュースデータの取得に失敗しました。しばらくしてから再度お試しください。';
-        lastUpdatedEl.textContent = '';
+        tryFetch(index + 1);
       });
   }
 
