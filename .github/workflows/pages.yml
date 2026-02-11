@@ -1,11 +1,14 @@
-name: Deploy to GitHub Pages
+name: Fetch RSS & Deploy
 
 on:
   push:
     branches: [master]
+  schedule:
+    - cron: '0 * * * *'  # 毎時実行
+  workflow_dispatch:       # 手動実行可
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -14,13 +17,48 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  fetch-and-deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch RSS and convert to JSON
+        run: |
+          python3 - <<'PYEOF'
+          import urllib.request, xml.etree.ElementTree as ET, json, re, html
+
+          url = "https://news.google.com/rss/search?q=%E5%80%92%E7%94%A3&hl=ja&gl=JP&ceid=JP:ja"
+          req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+          data = urllib.request.urlopen(req, timeout=30).read()
+          root = ET.fromstring(data)
+
+          items = []
+          for item in root.iter("item"):
+              raw_title = item.findtext("title", "")
+              source_el = item.find("source")
+              source = source_el.text if source_el is not None and source_el.text else ""
+              if not source:
+                  m = re.search(r'[-\u2013\u2014]\s*(.+)$', raw_title)
+                  source = m.group(1).strip() if m else ""
+              title = re.sub(r'\s*[-\u2013\u2014]\s*[^\-\u2013\u2014]+$', '', raw_title) if source else raw_title
+              desc_raw = item.findtext("description", "")
+              desc = re.sub(r'<[^>]+>', '', html.unescape(desc_raw)).strip()
+              items.append({
+                  "title": title,
+                  "source": source,
+                  "pubDate": item.findtext("pubDate", ""),
+                  "link": item.findtext("link", ""),
+                  "description": desc
+              })
+
+          with open("news.json", "w", encoding="utf-8") as f:
+              json.dump({"items": items, "fetched": __import__("datetime").datetime.utcnow().isoformat() + "Z"}, f, ensure_ascii=False)
+          print(f"Saved {len(items)} articles")
+          PYEOF
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
