@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>倒産ニュースまとめ</title>
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Hiragino Sans','Meiryo',sans-serif;background:#f0f2f5;color:#333;line-height:1.6}
+
+  /* Header */
+  header{background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:24px 0;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  header h1{font-size:1.8rem;letter-spacing:.05em}
+  header h1 span{color:#e74c3c}
+  .last-updated{font-size:.85rem;color:#aab;margin-top:6px}
+
+  /* Controls */
+  .controls{max-width:1200px;margin:20px auto;padding:0 16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .search-box{flex:1;min-width:200px;padding:10px 16px;border:1px solid #ccc;border-radius:8px;font-size:1rem;outline:none;transition:border-color .2s}
+  .search-box:focus{border-color:#3498db}
+  .btn{padding:10px 20px;border:none;border-radius:8px;font-size:.95rem;cursor:pointer;transition:background .2s,transform .1s}
+  .btn:active{transform:scale(.97)}
+  .btn-primary{background:#3498db;color:#fff}
+  .btn-primary:hover{background:#2980b9}
+
+  /* Status */
+  .status{text-align:center;padding:12px;font-size:.9rem;color:#666}
+  .status.error{color:#e74c3c}
+
+  /* Card Grid */
+  .card-grid{max-width:1200px;margin:0 auto 40px;padding:0 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px}
+
+  /* Card */
+  .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column}
+  .card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,.12)}
+  .card a{text-decoration:none;color:inherit;display:flex;flex-direction:column;flex:1;padding:20px 24px}
+  .card-source{font-size:.75rem;color:#fff;background:#e74c3c;display:inline-block;padding:2px 10px;border-radius:4px;margin-bottom:10px;align-self:flex-start}
+  .card-title{font-size:1.05rem;font-weight:700;margin-bottom:8px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .card-date{font-size:.8rem;color:#888;margin-bottom:8px}
+  .card-desc{font-size:.88rem;color:#555;flex:1;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* Footer */
+  footer{background:#1a1a2e;color:#aab;text-align:center;padding:20px 16px;font-size:.8rem;line-height:1.8}
+
+  /* Loading spinner */
+  .spinner{display:inline-block;width:20px;height:20px;border:3px solid #ccc;border-top-color:#3498db;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* No results */
+  .no-results{text-align:center;padding:60px 16px;color:#888;font-size:1.1rem}
+
+  /* Responsive */
+  @media(max-width:600px){
+    header h1{font-size:1.3rem}
+    .card-grid{grid-template-columns:1fr}
+    .controls{flex-direction:column}
+    .btn{width:100%}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>&#x1F4C9;</span> 倒産ニュースまとめ</h1>
+  <div class="last-updated" id="lastUpdated">読み込み中...</div>
+</header>
+
+<div class="controls">
+  <input type="text" class="search-box" id="searchBox" placeholder="キーワードで絞り込み...">
+  <button class="btn btn-primary" id="refreshBtn">&#x1F504; 更新</button>
+</div>
+
+<div class="status" id="status"></div>
+<div class="card-grid" id="cardGrid"></div>
+
+<footer>
+  <p>※ 本サイトはGoogle Newsから自動取得した情報を表示しています。内容の正確性は各出典元をご確認ください。</p>
+  <p>&copy; 2026 倒産ニュースまとめ</p>
+</footer>
+
+<script>
+(function () {
+  var RSS_URL = 'https://news.google.com/rss/search?q=倒産&hl=ja&gl=JP&ceid=JP:ja';
+
+  // Multiple CORS proxies / RSS APIs to try in order
+  var FETCH_STRATEGIES = [
+    {
+      name: 'allorigins',
+      url: 'https://api.allorigins.win/get?url=' + encodeURIComponent(RSS_URL),
+      parse: function (res) { return res.json().then(function (d) { return parseRssXml(d.contents); }); }
+    },
+    {
+      name: 'rss2json',
+      url: 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(RSS_URL) + '&count=30',
+      parse: function (res) {
+        return res.json().then(function (d) {
+          if (d.status !== 'ok' || !d.items || d.items.length === 0) throw new Error('rss2json: no items');
+          return d.items.map(function (item) {
+            return {
+              title: item.title || '',
+              source: item.author || extractSource(item.title),
+              pubDate: item.pubDate || '',
+              link: item.link || '#',
+              description: item.description || item.content || ''
+            };
+          });
+        });
+      }
+    },
+    {
+      name: 'corsproxy',
+      url: 'https://corsproxy.io/?' + encodeURIComponent(RSS_URL),
+      parse: function (res) { return res.text().then(function (xml) { return parseRssXml(xml); }); }
+    }
+  ];
+
+  var cardGrid = document.getElementById('cardGrid');
+  var statusEl = document.getElementById('status');
+  var lastUpdatedEl = document.getElementById('lastUpdated');
+  var searchBox = document.getElementById('searchBox');
+  var refreshBtn = document.getElementById('refreshBtn');
+
+  var articles = [];
+
+  // --- Sample fallback data ---
+  var sampleData = [
+    { title: '大手小売チェーンが民事再生法を申請　負債総額500億円', source: '日本経済新聞', pubDate: '2026-02-10', link: '#', description: '全国展開していた大手小売チェーンが経営難により民事再生法の適用を申請した。負債総額は約500億円に上る。' },
+    { title: '老舗旅館が破産手続き開始　コロナ後の回復遅れ響く', source: '朝日新聞', pubDate: '2026-02-09', link: '#', description: '創業100年を超える老舗旅館が破産手続き開始決定を受けた。観光需要の回復が想定より遅れたことが主因。' },
+    { title: '中堅IT企業が事業停止　受注減で資金繰り悪化', source: '読売新聞', pubDate: '2026-02-08', link: '#', description: '従業員約200名の中堅IT企業が事業を停止し、自己破産を申請する方針を固めた。' },
+    { title: '地方建設会社が倒産　公共工事の減少が直撃', source: '毎日新聞', pubDate: '2026-02-07', link: '#', description: '地方を拠点とする中堅建設会社が倒産した。公共工事の減少と資材価格の高騰が経営を圧迫していた。' },
+    { title: '飲食チェーンが全店閉鎖へ　人手不足で運営困難に', source: 'NHK', pubDate: '2026-02-06', link: '#', description: '全国に50店舗を展開していた飲食チェーンが全店閉鎖を決定。深刻な人手不足により事業継続が困難と判断した。' },
+    { title: '2026年1月の倒産件数が前年同月比15%増　帝国データ調べ', source: '帝国データバンク', pubDate: '2026-02-05', link: '#', description: '帝国データバンクの調査によると、2026年1月の企業倒産件数は前年同月比15%増となり、増加傾向が続いている。' },
+  ];
+
+  // --- RSS XML Parser ---
+  function parseRssXml(xmlStr) {
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(xmlStr, 'text/xml');
+    var errorNode = doc.querySelector('parsererror');
+    if (errorNode) throw new Error('XML parse error');
+    var items = doc.querySelectorAll('item');
+    if (items.length === 0) throw new Error('No items in RSS');
+    var results = [];
+    items.forEach(function (item) {
+      var titleEl = item.querySelector('title');
+      var linkEl = item.querySelector('link');
+      var pubDateEl = item.querySelector('pubDate');
+      var descEl = item.querySelector('description');
+      var sourceEl = item.querySelector('source');
+      var rawTitle = titleEl ? titleEl.textContent : '';
+      results.push({
+        title: sourceEl ? rawTitle : rawTitle.replace(/\s*[-\u2013\u2014]\s*[^\-\u2013\u2014]+$/, ''),
+        source: sourceEl ? sourceEl.textContent : extractSource(rawTitle),
+        pubDate: pubDateEl ? pubDateEl.textContent : '',
+        link: linkEl ? linkEl.textContent : '#',
+        description: descEl ? descEl.textContent : ''
+      });
+    });
+    return results;
+  }
+
+  // --- Render ---
+  function renderCards(data) {
+    cardGrid.innerHTML = '';
+    if (data.length === 0) {
+      cardGrid.innerHTML = '<div class="no-results">該当するニュースが見つかりませんでした。</div>';
+      return;
+    }
+    data.forEach(function (item) {
+      var date = item.pubDate ? new Date(item.pubDate) : null;
+      var dateStr = date && !isNaN(date) ? date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+      var desc = stripHtml(item.description || '');
+
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML =
+        '<a href="' + escapeAttr(item.link || '#') + '" target="_blank" rel="noopener noreferrer">' +
+          (item.source ? '<span class="card-source">' + escapeHtml(item.source) + '</span>' : '') +
+          '<div class="card-title">' + escapeHtml(item.title) + '</div>' +
+          '<div class="card-date">' + escapeHtml(dateStr) + '</div>' +
+          '<div class="card-desc">' + escapeHtml(desc) + '</div>' +
+        '</a>';
+      cardGrid.appendChild(card);
+    });
+  }
+
+  function escapeHtml(str) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(str));
+    return d.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function stripHtml(html) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  }
+
+  // --- Fetch with fallback chain ---
+  function fetchNews() {
+    statusEl.className = 'status';
+    statusEl.innerHTML = '<span class="spinner"></span>ニュースを取得中...';
+    cardGrid.innerHTML = '';
+
+    tryFetchStrategies(0);
+  }
+
+  function tryFetchStrategies(index) {
+    if (index >= FETCH_STRATEGIES.length) {
+      // All strategies failed — show sample data
+      statusEl.className = 'status error';
+      statusEl.textContent = 'RSSフィードの取得に失敗しました。サンプルデータを表示しています。';
+      articles = sampleData;
+      renderCards(filterArticles());
+      updateTimestamp();
+      return;
+    }
+
+    var strategy = FETCH_STRATEGIES[index];
+    console.log('[倒産ニュース] Trying: ' + strategy.name);
+
+    fetch(strategy.url, { signal: AbortSignal.timeout(10000) })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return strategy.parse(res);
+      })
+      .then(function (items) {
+        if (!items || items.length === 0) throw new Error('Empty result');
+        console.log('[倒産ニュース] Success via ' + strategy.name + ': ' + items.length + ' items');
+        articles = items;
+        statusEl.textContent = '';
+        renderCards(filterArticles());
+        updateTimestamp();
+      })
+      .catch(function (err) {
+        console.warn('[倒産ニュース] ' + strategy.name + ' failed:', err.message);
+        tryFetchStrategies(index + 1);
+      });
+  }
+
+  function extractSource(title) {
+    if (!title) return '';
+    var match = title.match(/[-\u2013\u2014]\s*(.+)$/);
+    return match ? match[1].trim() : '';
+  }
+
+  function updateTimestamp() {
+    var now = new Date();
+    lastUpdatedEl.textContent = '最終更新: ' + now.toLocaleString('ja-JP');
+  }
+
+  // --- Filter ---
+  function filterArticles() {
+    var keyword = searchBox.value.trim().toLowerCase();
+    if (!keyword) return articles;
+    return articles.filter(function (a) {
+      return (a.title + ' ' + a.description + ' ' + a.source).toLowerCase().indexOf(keyword) !== -1;
+    });
+  }
+
+  // --- Events ---
+  searchBox.addEventListener('input', function () {
+    renderCards(filterArticles());
+  });
+
+  refreshBtn.addEventListener('click', function () {
+    searchBox.value = '';
+    fetchNews();
+  });
+
+  // --- Init ---
+  fetchNews();
+})();
+</script>
+</body>
+</html>
