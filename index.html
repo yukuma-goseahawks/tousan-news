@@ -125,43 +125,47 @@
     return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  // --- Data sources (try raw GitHub first for freshest data, then local) ---
-  var DATA_URLS = [
-    'https://raw.githubusercontent.com/yukuma-goseahawks/tousan-news/master/news.json',
-    'news.json'
-  ];
+  // --- GitHub API (no CDN cache) then fallback to static file ---
+  var GITHUB_API_URL = 'https://api.github.com/repos/yukuma-goseahawks/tousan-news/contents/news.json?ref=master';
 
   function fetchNews() {
     statusEl.className = 'status';
     statusEl.innerHTML = '<span class="spinner"></span>ニュースを取得中...';
     cardGrid.innerHTML = '';
-    tryFetch(0);
-  }
 
-  function tryFetch(index) {
-    if (index >= DATA_URLS.length) {
-      statusEl.className = 'status error';
-      statusEl.textContent = 'ニュースデータの取得に失敗しました。しばらくしてから再度お試しください。';
-      lastUpdatedEl.textContent = '';
-      return;
-    }
-    var url = DATA_URLS[index] + '?t=' + Date.now();
-    fetch(url)
+    // Try GitHub API first (returns raw file, no CDN cache)
+    fetch(GITHUB_API_URL, {
+      headers: { 'Accept': 'application/vnd.github.raw+json' },
+      cache: 'no-store'
+    })
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
-      .then(function (data) {
-        if (!data.items || data.items.length === 0) throw new Error('No items');
-        articles = data.items;
-        statusEl.textContent = '';
-        renderCards(filterArticles());
-        var fetched = data.fetched ? new Date(data.fetched) : null;
-        lastUpdatedEl.textContent = '最終更新: ' + (fetched && !isNaN(fetched) ? fetched.toLocaleString('ja-JP') : '不明');
-      })
+      .then(handleData)
       .catch(function () {
-        tryFetch(index + 1);
+        // Fallback: static news.json deployed with the page
+        fetch('news.json', { cache: 'no-store' })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(handleData)
+          .catch(function () {
+            statusEl.className = 'status error';
+            statusEl.textContent = 'ニュースデータの取得に失敗しました。しばらくしてから再度お試しください。';
+            lastUpdatedEl.textContent = '';
+          });
       });
+  }
+
+  function handleData(data) {
+    if (!data.items || data.items.length === 0) throw new Error('No items');
+    articles = data.items;
+    statusEl.textContent = '';
+    renderCards(filterArticles());
+    var fetched = data.fetched ? new Date(data.fetched) : null;
+    lastUpdatedEl.textContent = '最終更新: ' + (fetched && !isNaN(fetched) ? fetched.toLocaleString('ja-JP') : '不明');
   }
 
   // --- Filter ---
