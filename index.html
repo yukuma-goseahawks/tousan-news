@@ -87,15 +87,13 @@
   .card-desc{font-size:.85rem;color:var(--text-secondary);line-height:1.7;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .card-arrow{margin-top:auto;padding-top:12px;font-size:.78rem;color:var(--blue);font-weight:600;letter-spacing:.02em}
 
-  /* Featured cards (top 3) */
-  .card.featured{border-top:3px solid var(--accent);background:#fffdf8}
-  .card.featured:hover{background:#faf6ee}
+  /* Featured cards (rows 1-2) */
   .card.featured .card-title{font-size:1.15rem}
-  .card.featured .card-badge{display:inline-block;font-size:.65rem;font-weight:700;color:#fff;background:var(--accent);padding:2px 8px;border-radius:2px;margin-bottom:8px;letter-spacing:.06em}
-  .card.featured-tsr{border-top-color:var(--blue);background:#f6f9ff}
+  .card.featured .card-badge{display:inline-block;font-size:.65rem;font-weight:700;color:#fff;padding:2px 8px;border-radius:2px;margin-bottom:8px;letter-spacing:.06em}
+  .card.featured-tsr{border-top:3px solid var(--blue);background:#f6f9ff}
   .card.featured-tsr:hover{background:#eef3fc}
   .card.featured-tsr .card-badge{background:var(--blue)}
-  .card.featured-tdb{border-top-color:var(--gold);background:#fffbf0}
+  .card.featured-tdb{border-top:3px solid var(--gold);background:#fffbf0}
   .card.featured-tdb:hover{background:#faf5e6}
   .card.featured-tdb .card-badge{background:var(--gold)}
 
@@ -201,14 +199,15 @@
       cardGrid.innerHTML = '<div class="no-results">該当するニュースが見つかりませんでした。</div>';
       return;
     }
+    var prioritySlots = PRIORITY_ROWS * COLS;
     data.forEach(function (item, idx) {
       var date = item.pubDate ? new Date(item.pubDate) : null;
       var dateStr = date && !isNaN(date) ? date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-      var isFeatured = idx < 3 && isPriority(item);
       var isInsight = isTsrInsight(item);
       var isTdbItem = isTdb(item);
-      var badgeLabel = isInsight ? 'TSR INSIGHT' : isTdbItem ? 'TDB' : 'TSR';
-      var featuredClass = isFeatured ? (isInsight ? ' featured featured-tsr' : isTdbItem ? ' featured featured-tdb' : ' featured') : '';
+      var isFeatured = idx < prioritySlots && (isInsight || isTdbItem);
+      var badgeLabel = isInsight ? 'TSR INSIGHT' : 'TDB';
+      var featuredClass = isFeatured ? (isInsight ? ' featured featured-tsr' : ' featured featured-tdb') : '';
 
       var card = document.createElement('div');
       card.className = 'card' + featuredClass;
@@ -280,41 +279,56 @@
     lastUpdatedEl.textContent = '最終更新: ' + (fetched && !isNaN(fetched) ? fetched.toLocaleString('ja-JP') : '不明');
   }
 
-  // --- Priority sources ---
+  // --- Source detection ---
   function isTsrInsight(a) {
     return a.feed === 'tsr' || (a.source || '').indexOf('TSRデータインサイト') !== -1;
-  }
-  function isTsr(a) {
-    if (isTsrInsight(a)) return false;
-    var s = (a.source || '').toLowerCase();
-    return s.indexOf('東京商工リサーチ') !== -1 || s.indexOf('tsr') !== -1 || s.indexOf('tsr-net') !== -1;
   }
   function isTdb(a) {
     var s = (a.source || '').toLowerCase();
     return s.indexOf('帝国データバンク') !== -1 || s.indexOf('tdb') !== -1;
   }
-  function isPriority(a) {
-    return isTsr(a) || isTdb(a) || isTsrInsight(a);
+
+  // --- Deduplication ---
+  function normalizeTitle(t) {
+    return t.replace(/\s+/g, '').replace(/[-\u2013\u2014]\s*[^\-\u2013\u2014]+$/, '').replace(/\uff08[^\uff09]*\uff09$/, '').substring(0, 25);
+  }
+  function deduplicate(list) {
+    var seen = {};
+    return list.filter(function (a) {
+      var key = normalizeTitle(a.title);
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
   }
 
-  function sortWithPriority(list) {
-    var tsrPick = null;     // slot 1: TSR速報
-    var insightPick = null; // slot 2: TSRデータインサイト
-    var tdbPick = null;     // slot 3: 帝国データバンク
+  // --- Layout: rows 1-2 alternate TSR Insight & TDB, row 3+ everything else ---
+  var PRIORITY_ROWS = 2; // 2 rows x 3 columns = 6 cards
+  var COLS = 3;
+
+  function sortForLayout(list) {
+    var prioritySlots = PRIORITY_ROWS * COLS;
+    var insightPool = [];
+    var tdbPool = [];
     var rest = [];
 
     list.forEach(function (a) {
-      if (!tsrPick && isTsr(a)) { tsrPick = a; }
-      else if (!insightPick && isTsrInsight(a)) { insightPick = a; }
-      else if (!tdbPick && isTdb(a)) { tdbPick = a; }
+      if (isTsrInsight(a)) { insightPool.push(a); }
+      else if (isTdb(a)) { tdbPool.push(a); }
       else { rest.push(a); }
     });
 
-    var top = [];
-    if (tsrPick) top.push(tsrPick);
-    if (insightPick) top.push(insightPick);
-    if (tdbPick) top.push(tdbPick);
-    return top.concat(rest);
+    // Interleave: TSR, TDB, TSR, TDB, ... to fill up to prioritySlots
+    var priority = [];
+    var iI = 0, iT = 0;
+    while (priority.length < prioritySlots && (iI < insightPool.length || iT < tdbPool.length)) {
+      if (iI < insightPool.length) { priority.push(insightPool[iI++]); }
+      if (priority.length < prioritySlots && iT < tdbPool.length) { priority.push(tdbPool[iT++]); }
+    }
+
+    // Leftover priority items go to rest
+    var leftover = insightPool.slice(iI).concat(tdbPool.slice(iT));
+    return priority.concat(leftover).concat(rest);
   }
 
   // --- Filter ---
@@ -323,7 +337,7 @@
     var filtered = keyword ? articles.filter(function (a) {
       return (a.title + ' ' + a.description + ' ' + a.source).toLowerCase().indexOf(keyword) !== -1;
     }) : articles;
-    return sortWithPriority(filtered);
+    return sortForLayout(deduplicate(filtered));
   }
 
   // --- Events ---
