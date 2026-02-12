@@ -6,79 +6,180 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <title>倒産ニュースまとめ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Segoe UI','Hiragino Sans','Meiryo',sans-serif;background:#f0f2f5;color:#333;line-height:1.6}
+  :root{
+    --navy:#0a1628;
+    --navy-light:#112240;
+    --accent:#c8102e;
+    --accent-hover:#e8253f;
+    --blue:#1a73e8;
+    --blue-dark:#155ab6;
+    --gold:#c9930a;
+    --gold-hover:#e0a80d;
+    --bg:#f4f4f0;
+    --card-bg:#ffffff;
+    --text:#1a1a1a;
+    --text-secondary:#555;
+    --text-muted:#888;
+    --border:#d6d6d0;
+    --font-serif:'Noto Serif JP','Georgia','Times New Roman',serif;
+    --font-sans:'Noto Sans JP','Segoe UI','Hiragino Sans','Meiryo',sans-serif;
+  }
+  body{font-family:var(--font-sans);background:var(--bg);color:var(--text);line-height:1.7}
 
-  /* Header */
-  header{background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:24px 0;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-  header h1{font-size:1.8rem;letter-spacing:.05em}
-  header h1 span{color:#e74c3c}
-  .last-updated{font-size:.85rem;color:#aab;margin-top:6px}
+  /* ===== Top Bar (ESPN-style) ===== */
+  .topbar{background:var(--navy);border-bottom:3px solid var(--accent);padding:0 16px}
+  .topbar-inner{max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;min-height:44px;gap:12px}
+  .topbar-left,.topbar-right{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .topbar-link{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;font-size:.78rem;font-weight:700;text-decoration:none;color:rgba(255,255,255,.85);border-radius:4px;transition:all .15s;letter-spacing:.02em;white-space:nowrap}
+  .topbar-link:hover{color:#fff;background:rgba(255,255,255,.1)}
+  .topbar-link.tsr{border-left:3px solid var(--accent);padding-left:9px}
+  .topbar-link.tsr-data{border-left:3px solid var(--blue);padding-left:9px}
+  .topbar-link.tdb{border-left:3px solid var(--gold);padding-left:9px}
+  .topbar-dot{color:rgba(255,255,255,.25);font-size:.7rem}
 
-  /* Controls */
-  .controls{max-width:1200px;margin:20px auto;padding:0 16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-  .search-box{flex:1;min-width:200px;padding:10px 16px;border:1px solid #ccc;border-radius:8px;font-size:1rem;outline:none;transition:border-color .2s}
-  .search-box:focus{border-color:#3498db}
-  .btn{padding:10px 20px;border:none;border-radius:8px;font-size:.95rem;cursor:pointer;transition:background .2s,transform .1s}
-  .btn:active{transform:scale(.97)}
-  .btn-primary{background:#3498db;color:#fff}
-  .btn-primary:hover{background:#2980b9}
+  /* ===== Header (NYT-style) ===== */
+  header{background:var(--card-bg);border-bottom:2px solid var(--text);padding:28px 16px 20px;text-align:center}
+  .header-inner{max-width:1200px;margin:0 auto}
+  .header-rule{display:block;width:80px;height:2px;background:var(--accent);margin:0 auto 16px}
+  header h1{font-family:var(--font-serif);font-size:2.2rem;font-weight:900;letter-spacing:.08em;color:var(--text);line-height:1.3}
+  .header-sub{font-size:.85rem;color:var(--text-muted);margin-top:8px;font-family:var(--font-sans);letter-spacing:.04em}
+  .header-date{font-size:.8rem;color:var(--text-muted);margin-top:4px;font-family:var(--font-sans)}
 
-  /* Status */
-  .status{text-align:center;padding:12px;font-size:.9rem;color:#666}
-  .status.error{color:#e74c3c}
+  /* ===== Controls (S&P Global-style) ===== */
+  .controls-bar{background:var(--card-bg);border-bottom:1px solid var(--border);padding:12px 16px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .controls-inner{max-width:1200px;margin:0 auto;display:flex;gap:12px;align-items:center}
+  .search-box{flex:1;min-width:180px;padding:9px 16px;border:1px solid var(--border);border-radius:4px;font-size:.9rem;font-family:var(--font-sans);outline:none;background:#fafaf8;transition:border-color .2s,box-shadow .2s}
+  .search-box:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,115,232,.12)}
+  .btn{padding:9px 20px;border:none;border-radius:4px;font-size:.85rem;font-weight:700;font-family:var(--font-sans);cursor:pointer;transition:background .15s;letter-spacing:.02em}
+  .btn-primary{background:var(--navy);color:#fff}
+  .btn-primary:hover{background:var(--navy-light)}
+  .article-count{font-size:.82rem;color:var(--text-muted);white-space:nowrap}
 
-  /* Card Grid */
-  .card-grid{max-width:1200px;margin:0 auto 40px;padding:0 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px}
+  /* ===== Status ===== */
+  .status{text-align:center;padding:16px;font-size:.9rem;color:var(--text-muted)}
+  .status.error{color:var(--accent)}
 
-  /* Card */
-  .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column}
-  .card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,.12)}
-  .card a{text-decoration:none;color:inherit;display:flex;flex-direction:column;flex:1;padding:20px 24px}
-  .card-source{font-size:.75rem;color:#fff;background:#e74c3c;display:inline-block;padding:2px 10px;border-radius:4px;margin-bottom:10px;align-self:flex-start}
-  .card-title{font-size:1.05rem;font-weight:700;margin-bottom:8px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-  .card-date{font-size:.8rem;color:#888;margin-bottom:8px}
-  .card-desc{font-size:.88rem;color:#555;flex:1;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  /* ===== Section ===== */
+  .section{max-width:1200px;margin:0 auto;padding:28px 16px 40px}
+  .section-header{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .section-title{font-family:var(--font-serif);font-size:1.1rem;font-weight:700;color:var(--text)}
+  .section-line{flex:1;height:1px;background:var(--border)}
+  .section-badge{font-size:.72rem;font-weight:700;color:#fff;background:var(--accent);padding:3px 10px;border-radius:3px;letter-spacing:.04em}
 
-  /* Footer */
-  footer{background:#1a1a2e;color:#aab;text-align:center;padding:20px 16px;font-size:.8rem;line-height:1.8}
+  /* ===== Card Grid ===== */
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:1px;background:var(--border)}
 
-  /* Loading spinner */
-  .spinner{display:inline-block;width:20px;height:20px;border:3px solid #ccc;border-top-color:#3498db;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+  /* ===== Card (NYT + S&P hybrid) ===== */
+  .card{background:var(--card-bg);display:flex;flex-direction:column;transition:background .15s}
+  .card:hover{background:#f8f8f5}
+  .card a{text-decoration:none;color:inherit;display:flex;flex-direction:column;flex:1;padding:24px 28px}
+  .card-meta{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .card-source{font-size:.72rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em}
+  .card-date{font-size:.75rem;color:var(--text-muted)}
+  .card-meta-dot{width:3px;height:3px;border-radius:50%;background:var(--text-muted)}
+  .card-title{font-family:var(--font-serif);font-size:1.08rem;font-weight:700;line-height:1.6;margin-bottom:10px;color:var(--text);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .card:hover .card-title{color:var(--blue-dark)}
+  .card-desc{font-size:.85rem;color:var(--text-secondary);line-height:1.7;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .card-arrow{margin-top:auto;padding-top:12px;font-size:.78rem;color:var(--blue);font-weight:600;letter-spacing:.02em}
+
+  /* Featured cards (top 3) */
+  .card.featured{border-top:3px solid var(--accent);background:#fffdf8}
+  .card.featured:hover{background:#faf6ee}
+  .card.featured .card-title{font-size:1.15rem}
+  .card.featured .card-badge{display:inline-block;font-size:.65rem;font-weight:700;color:#fff;background:var(--accent);padding:2px 8px;border-radius:2px;margin-bottom:8px;letter-spacing:.06em}
+  .card.featured-tsr{border-top-color:var(--blue);background:#f6f9ff}
+  .card.featured-tsr:hover{background:#eef3fc}
+  .card.featured-tsr .card-badge{background:var(--blue)}
+  .card.featured-tdb{border-top-color:var(--gold);background:#fffbf0}
+  .card.featured-tdb:hover{background:#faf5e6}
+  .card.featured-tdb .card-badge{background:var(--gold)}
+
+  /* ===== Footer ===== */
+  footer{background:var(--navy);color:rgba(255,255,255,.6);padding:32px 16px;font-size:.78rem;line-height:2}
+  .footer-inner{max-width:1200px;margin:0 auto;text-align:center}
+  .footer-inner p+p{margin-top:2px}
+  .footer-rule{width:60px;height:1px;background:rgba(255,255,255,.15);margin:16px auto}
+
+  /* ===== Spinner ===== */
+  .spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:8px}
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  /* No results */
-  .no-results{text-align:center;padding:60px 16px;color:#888;font-size:1.1rem}
+  /* ===== No results ===== */
+  .no-results{text-align:center;padding:80px 16px;color:var(--text-muted);font-size:1rem;background:var(--card-bg)}
 
-  /* Responsive */
-  @media(max-width:600px){
-    header h1{font-size:1.3rem}
+  /* ===== Responsive ===== */
+  @media(max-width:768px){
+    header h1{font-size:1.6rem}
+    .topbar-inner{flex-direction:column;align-items:flex-start;padding:8px 0;gap:4px}
+    .topbar-right{margin-left:0}
+    .topbar-dot{display:none}
+    .controls-inner{flex-direction:column;align-items:stretch}
+    .article-count{text-align:center}
     .card-grid{grid-template-columns:1fr}
-    .controls{flex-direction:column}
+    .card a{padding:20px}
     .btn{width:100%}
   }
 </style>
 </head>
 <body>
 
+<!-- Top Bar -->
+<nav class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-left">
+      <a class="topbar-link tsr" href="https://www.tsr-net.co.jp/news/tsr/" target="_blank" rel="noopener noreferrer">TSR速報</a>
+      <span class="topbar-dot">|</span>
+      <a class="topbar-link tsr-data" href="https://www.tsr-net.co.jp/data/" target="_blank" rel="noopener noreferrer">TSRデータインサイト</a>
+    </div>
+    <div class="topbar-right">
+      <a class="topbar-link tdb" href="https://www.tdb.co.jp/report/bankruptcy/" target="_blank" rel="noopener noreferrer">帝国データバンク 倒産集計</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Header -->
 <header>
-  <h1><span>&#x1F4C9;</span> 倒産ニュースまとめ</h1>
-  <div class="last-updated" id="lastUpdated">読み込み中...</div>
+  <div class="header-inner">
+    <span class="header-rule"></span>
+    <h1>倒産ニュースまとめ</h1>
+    <div class="header-sub" id="lastUpdated">読み込み中...</div>
+  </div>
 </header>
 
-<div class="controls">
-  <input type="text" class="search-box" id="searchBox" placeholder="キーワードで絞り込み...">
-  <button class="btn btn-primary" id="refreshBtn">&#x1F504; 更新</button>
+<!-- Controls -->
+<div class="controls-bar">
+  <div class="controls-inner">
+    <input type="text" class="search-box" id="searchBox" placeholder="キーワードで絞り込み...">
+    <button class="btn btn-primary" id="refreshBtn">更新</button>
+    <span class="article-count" id="articleCount"></span>
+  </div>
 </div>
 
 <div class="status" id="status"></div>
-<div class="card-grid" id="cardGrid"></div>
 
+<!-- News Section -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-badge">LATEST</span>
+    <span class="section-title">最新の倒産ニュース</span>
+    <span class="section-line"></span>
+  </div>
+  <div class="card-grid" id="cardGrid"></div>
+</div>
+
+<!-- Footer -->
 <footer>
-  <p>※ 本サイトはGoogle Newsから自動取得した情報を表示しています。内容の正確性は各出典元をご確認ください。</p>
-  <p>ニュースは30分ごとに自動更新されます。</p>
-  <p>&copy; 2026 倒産ニュースまとめ</p>
+  <div class="footer-inner">
+    <p>本サイトはGoogle Newsから自動取得した情報を表示しています。内容の正確性は各出典元をご確認ください。</p>
+    <p>ニュースは30分ごとに自動更新されます。</p>
+    <div class="footer-rule"></div>
+    <p>&copy; 2026 倒産ニュースまとめ</p>
+  </div>
 </footer>
 
 <script>
@@ -88,28 +189,40 @@
   var lastUpdatedEl = document.getElementById('lastUpdated');
   var searchBox = document.getElementById('searchBox');
   var refreshBtn = document.getElementById('refreshBtn');
+  var articleCountEl = document.getElementById('articleCount');
 
   var articles = [];
 
   // --- Render ---
   function renderCards(data) {
     cardGrid.innerHTML = '';
+    articleCountEl.textContent = data.length + '件';
     if (data.length === 0) {
       cardGrid.innerHTML = '<div class="no-results">該当するニュースが見つかりませんでした。</div>';
       return;
     }
-    data.forEach(function (item) {
+    data.forEach(function (item, idx) {
       var date = item.pubDate ? new Date(item.pubDate) : null;
       var dateStr = date && !isNaN(date) ? date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+      var isFeatured = idx < 3 && isPriority(item);
+      var isInsight = isTsrInsight(item);
+      var isTdbItem = isTdb(item);
+      var badgeLabel = isInsight ? 'TSR INSIGHT' : isTdbItem ? 'TDB' : 'TSR';
+      var featuredClass = isFeatured ? (isInsight ? ' featured featured-tsr' : isTdbItem ? ' featured featured-tdb' : ' featured') : '';
 
       var card = document.createElement('div');
-      card.className = 'card';
+      card.className = 'card' + featuredClass;
       card.innerHTML =
         '<a href="' + escapeAttr(item.link || '#') + '" target="_blank" rel="noopener noreferrer">' +
-          (item.source ? '<span class="card-source">' + escapeHtml(item.source) + '</span>' : '') +
+          (isFeatured ? '<span class="card-badge">' + badgeLabel + '</span>' : '') +
+          '<div class="card-meta">' +
+            (item.source ? '<span class="card-source">' + escapeHtml(item.source) + '</span>' : '') +
+            (item.source && dateStr ? '<span class="card-meta-dot"></span>' : '') +
+            '<span class="card-date">' + escapeHtml(dateStr) + '</span>' +
+          '</div>' +
           '<div class="card-title">' + escapeHtml(item.title) + '</div>' +
-          '<div class="card-date">' + escapeHtml(dateStr) + '</div>' +
           '<div class="card-desc">' + escapeHtml(item.description || '') + '</div>' +
+          '<div class="card-arrow">Read more &rarr;</div>' +
         '</a>';
       cardGrid.appendChild(card);
     });
@@ -132,8 +245,8 @@
     statusEl.className = 'status';
     statusEl.innerHTML = '<span class="spinner"></span>ニュースを取得中...';
     cardGrid.innerHTML = '';
+    articleCountEl.textContent = '';
 
-    // Try GitHub API first (returns raw file, no CDN cache)
     fetch(GITHUB_API_URL, {
       headers: { 'Accept': 'application/vnd.github.raw+json' },
       cache: 'no-store'
@@ -144,7 +257,6 @@
       })
       .then(handleData)
       .catch(function () {
-        // Fallback: static news.json deployed with the page
         fetch('news.json', { cache: 'no-store' })
           .then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -168,13 +280,50 @@
     lastUpdatedEl.textContent = '最終更新: ' + (fetched && !isNaN(fetched) ? fetched.toLocaleString('ja-JP') : '不明');
   }
 
+  // --- Priority sources ---
+  function isTsrInsight(a) {
+    return a.feed === 'tsr' || (a.source || '').indexOf('TSRデータインサイト') !== -1;
+  }
+  function isTsr(a) {
+    if (isTsrInsight(a)) return false;
+    var s = (a.source || '').toLowerCase();
+    return s.indexOf('東京商工リサーチ') !== -1 || s.indexOf('tsr') !== -1 || s.indexOf('tsr-net') !== -1;
+  }
+  function isTdb(a) {
+    var s = (a.source || '').toLowerCase();
+    return s.indexOf('帝国データバンク') !== -1 || s.indexOf('tdb') !== -1;
+  }
+  function isPriority(a) {
+    return isTsr(a) || isTdb(a) || isTsrInsight(a);
+  }
+
+  function sortWithPriority(list) {
+    var tsrPick = null;     // slot 1: TSR速報
+    var insightPick = null; // slot 2: TSRデータインサイト
+    var tdbPick = null;     // slot 3: 帝国データバンク
+    var rest = [];
+
+    list.forEach(function (a) {
+      if (!tsrPick && isTsr(a)) { tsrPick = a; }
+      else if (!insightPick && isTsrInsight(a)) { insightPick = a; }
+      else if (!tdbPick && isTdb(a)) { tdbPick = a; }
+      else { rest.push(a); }
+    });
+
+    var top = [];
+    if (tsrPick) top.push(tsrPick);
+    if (insightPick) top.push(insightPick);
+    if (tdbPick) top.push(tdbPick);
+    return top.concat(rest);
+  }
+
   // --- Filter ---
   function filterArticles() {
     var keyword = searchBox.value.trim().toLowerCase();
-    if (!keyword) return articles;
-    return articles.filter(function (a) {
+    var filtered = keyword ? articles.filter(function (a) {
       return (a.title + ' ' + a.description + ' ' + a.source).toLowerCase().indexOf(keyword) !== -1;
-    });
+    }) : articles;
+    return sortWithPriority(filtered);
   }
 
   // --- Events ---
