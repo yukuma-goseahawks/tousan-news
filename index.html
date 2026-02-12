@@ -287,19 +287,77 @@
     var s = (a.source || '').toLowerCase();
     return s.indexOf('帝国データバンク') !== -1 || s.indexOf('tdb') !== -1;
   }
-
-  // --- Deduplication ---
-  function normalizeTitle(t) {
-    return t.replace(/\s+/g, '').replace(/[-\u2013\u2014]\s*[^\-\u2013\u2014]+$/, '').replace(/\uff08[^\uff09]*\uff09$/, '').substring(0, 25);
+  function sourcePriority(a) {
+    if (isTsrInsight(a)) return 0;
+    if (isTdb(a)) return 1;
+    var s = (a.source || '').toLowerCase();
+    if (s.indexOf('東京商工リサーチ') !== -1 || s.indexOf('tsr') !== -1) return 2;
+    return 3;
   }
-  function deduplicate(list) {
-    var seen = {};
-    return list.filter(function (a) {
-      var key = normalizeTitle(a.title);
-      if (seen[key]) return false;
-      seen[key] = true;
-      return true;
+
+  // --- Deduplication (keyword similarity with stopwords) ---
+  var KW_RE = /[\u4e00-\u9fff\u3400-\u4dbf]{2,}|[\u30a0-\u30ff]{2,}|\d+/g;
+
+  function extractKeywords(title) {
+    return title.match(KW_RE) || [];
+  }
+
+  function buildStopwords(list) {
+    var df = {};
+    list.forEach(function (a) {
+      var seen = {};
+      extractKeywords(a.title).forEach(function (w) {
+        if (!seen[w]) { df[w] = (df[w] || 0) + 1; seen[w] = true; }
+      });
     });
+    var threshold = Math.max(Math.floor(list.length * 0.1), 5);
+    var sw = {};
+    for (var w in df) { if (df[w] >= threshold) sw[w] = true; }
+    return sw;
+  }
+
+  function filteredKeywords(title, sw) {
+    var kw = extractKeywords(title);
+    var result = [];
+    kw.forEach(function (w) { if (!sw[w]) result.push(w); });
+    return result;
+  }
+
+  function fuzzyOverlap(arrA, arrB) {
+    if (!arrA.length || !arrB.length) return 0;
+    var smaller = arrA.length <= arrB.length ? arrA : arrB;
+    var larger = arrA.length <= arrB.length ? arrB : arrA;
+    var matches = 0;
+    smaller.forEach(function (w) {
+      for (var i = 0; i < larger.length; i++) {
+        if (w.indexOf(larger[i]) !== -1 || larger[i].indexOf(w) !== -1) {
+          matches++;
+          break;
+        }
+      }
+    });
+    return matches / smaller.length;
+  }
+
+  function deduplicate(list) {
+    var sw = buildStopwords(list);
+    var keep = [];
+    list.forEach(function (a) {
+      var kwA = filteredKeywords(a.title, sw);
+      var isDup = false;
+      for (var j = 0; j < keep.length; j++) {
+        var kwB = filteredKeywords(keep[j].title, sw);
+        if (fuzzyOverlap(kwA, kwB) >= 0.5) {
+          if (sourcePriority(a) < sourcePriority(keep[j])) {
+            keep[j] = a; // replace with higher priority source
+          }
+          isDup = true;
+          break;
+        }
+      }
+      if (!isDup) keep.push(a);
+    });
+    return keep;
   }
 
   // --- Layout: rows 1-2 alternate TSR Insight & TDB, row 3+ everything else ---
